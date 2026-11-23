@@ -1,0 +1,45 @@
+# Segredos — NUNCA versionar
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# Ambientes virtuais
+venv/
+.venv/
+env/
+
+# Testes e cache
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs e temporários
+*.log
+_api_test.log
+tmp/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Sistema
+Thumbs.db
+.DS_Store
+
+# Dados locais
+*.sqlite
+*.db
+
+# Backups de trabalho
+*.bak
+*.bak_*
