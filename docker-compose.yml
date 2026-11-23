@@ -1,0 +1,92 @@
+# Atende-IA — stack completa
+#
+#   docker compose up -d
+#
+# Sobe a base (PostgreSQL 17 + pgvector), a API e a demo.
+#
+# O Ollama NAO vai aqui dentro: corre no host e e' partilhado com o resto do
+# sistema. Por isso o servico da API usa extra_hosts para alcancar o host.
+#
+# Para usar uma base externa (ex.: a que ja' existe no OMV), define PG_HOST no
+# .env e comenta o servico "db" (e o depends_on).
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: atende-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PG_USER:-atende}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?define PG_PASSWORD no .env}
+      POSTGRES_DB: ${PG_DATABASE:-atende_db}
+    ports:
+      - "${PG_PORT:-5433}:5432"
+    volumes:
+      - atende_dados:/var/lib/postgresql/data
+    healthcheck:
+      # pg_isready sozinho nao prova que a base aceita login; com -d e -U prova.
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-atende} -d ${PG_DATABASE:-atende_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  api:
+    build: .
+    container_name: atende-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PG_HOST: ${PG_HOST:-db}
+      PG_PORT: 5432
+      PG_USER: ${PG_USER:-atende}
+      PG_PASSWORD: ${PG_PASSWORD:?define PG_PASSWORD no .env}
+      PG_DATABASE: ${PG_DATABASE:-atende_db}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      ATENDE_LLM: ${ATENDE_LLM:-qwen2.5-coder:7b}
+      ATENDE_EMBED: ${ATENDE_EMBED:-nomic-embed-text:latest}
+      ATENDE_JWT_SECRET: ${ATENDE_JWT_SECRET:?define ATENDE_JWT_SECRET no .env}
+      ATENDE_LIMIAR: ${ATENDE_LIMIAR:-0.63}
+      ATENDE_FILA: ${ATENDE_FILA:-memoria}
+      ATENDE_AMBIENTE: ${ATENDE_AMBIENTE:-prod}
+    # host.docker.internal: alcancar o Ollama que corre no host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8100:8100"
+    # init_db.py cria o schema e VERIFICA no catalogo do Postgres antes de sair.
+    # Se falhar, o container nao arranca a API — falha explicita, nao silenciosa.
+    command: >
+      sh -c "python init_db.py &&
+             uvicorn app.api:app --host 0.0.0.0 --port 8100"
+
+  demo:
+    build: .
+    container_name: atende-demo
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      # A demo importa o agente directamente (nao fala com a API por HTTP),
+      # por isso precisa das MESMAS variaveis de base e de LLM que a API.
+      PG_HOST: ${PG_HOST:-db}
+      PG_PORT: 5432
+      PG_USER: ${PG_USER:-atende}
+      PG_PASSWORD: ${PG_PASSWORD:?define PG_PASSWORD no .env}
+      PG_DATABASE: ${PG_DATABASE:-atende_db}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      ATENDE_LLM: ${ATENDE_LLM:-qwen2.5-coder:7b}
+      ATENDE_EMBED: ${ATENDE_EMBED:-nomic-embed-text:latest}
+      ATENDE_JWT_SECRET: ${ATENDE_JWT_SECRET:?define ATENDE_JWT_SECRET no .env}
+      ATENDE_LIMIAR: ${ATENDE_LIMIAR:-0.63}
+      ATENDE_AMBIENTE: ${ATENDE_AMBIENTE:-prod}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8502:8501"
+    command: ["streamlit", "run", "app/demo.py", "--server.port=8501", "--server.address=0.0.0.0"]
+
+volumes:
+  atende_dados:
