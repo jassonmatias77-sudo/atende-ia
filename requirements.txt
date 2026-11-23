@@ -1,0 +1,28 @@
+# API
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+
+# Base de dados
+psycopg2-binary>=2.9
+pgvector>=0.2
+
+# Agentes
+langgraph>=0.2
+
+# Autenticação
+pyjwt>=2.8
+bcrypt>=4.1
+
+# Observabilidade
+prometheus-client>=0.19
+
+# Frontend
+streamlit>=1.31
+
+# HTTP
+requests>=2.31
+
+# Testes
+pytest>=8.0
+pytest-asyncio>=0.23
